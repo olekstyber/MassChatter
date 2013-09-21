@@ -15,6 +15,11 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
+protected:
+     bool eventFilter(QObject *obj, QEvent *e);
+
+private slots:
+
 private:
     Ui::MainWindow *ui;
 };
