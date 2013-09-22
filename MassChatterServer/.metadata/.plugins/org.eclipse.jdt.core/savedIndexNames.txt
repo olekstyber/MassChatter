@@ -1,0 +1,14 @@
+INDEX VERSION 1.126+/home/oleksandr/MassChatter/MassChatterServer/.metadata/.plugins/org.eclipse.jdt.core
+2898480234.index
+417373247.index
+1159935248.index
+262802227.index
+3937884183.index
+3721354332.index
+1230503809.index
+2005739584.index
+1825514421.index
+2456322530.index
+3422508414.index
+2683054613.index
+1698757907.index

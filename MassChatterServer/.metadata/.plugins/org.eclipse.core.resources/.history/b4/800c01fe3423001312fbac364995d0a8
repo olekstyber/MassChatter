@@ -1,0 +1,189 @@
+package mainPackage;
+
+import java.io.*;
+import java.net.*;
+import java.util.*;
+
+public class Server {
+	
+	private ArrayList<ClientThread> clients = new ArrayList<ClientThread>();
+	private static final int PORT = 5999;
+	private boolean serverRun;
+	private ServerSocket serverSocket;
+	
+	public Server() {
+		this.start();
+	}
+	
+	public void start() {
+		serverRun = true;
+		
+		try 
+		{
+			serverSocket = new ServerSocket(PORT);
+			while(serverRun) 
+			{
+				// format message saying we are waiting
+				System.out.println("Server waiting for Clients on port " + PORT + ".");
+				
+				Socket socket = serverSocket.accept();  	// accept connection
+				// if I was asked to stop
+				if(!serverRun)
+					break;
+				ClientThread client = new ClientThread(socket);  // make a thread of it
+				clients.add(client);									// save it in the ArrayList
+				client.start();
+			}
+			// I was asked to stop
+			try {
+				serverSocket.close();
+				for(int i = 0; i < clients.size(); ++i) {
+					ClientThread clientToDisconnect = clients.get(i);
+					try {
+					clientToDisconnect.sInput.close();
+					clientToDisconnect.sOutput.close();
+					clientToDisconnect.socket.close();
+					}
+					catch(IOException ioE) {}
+				}
+			}
+			catch(Exception e) {}
+		}
+		// something went bad
+		catch (IOException e) {}
+	}		
+
+	protected void stop() {
+		serverRun = false;
+	}
+
+	
+	private synchronized void broadcast(String message) {
+		// display message on console or GUI
+		//System.out.print(message);
+		
+		for(int i = clients.size(); --i >= 0;) {
+			ClientThread client = clients.get(i);
+			if(!client.writeMsg(message)) {
+				clients.remove(i);
+				System.out.println("Disconnected Client " + client.username + " removed from list.");
+			}
+		}
+	}
+
+	// for a client who logoff using the LOGOUT message
+	synchronized void remove(int position) {
+				clients.remove(position);
+				return;
+	}
+	
+	public static void main(String[] args) {
+		// create a server object
+		Server server = new Server();
+	}
+
+	//the client thread will be run for every client connected to the server
+	class ClientThread extends Thread {
+		// the socket where to listen/talk
+		Socket socket;
+		//ObjectInputStream sInput;
+		//ObjectOutputStream sOutput;
+		BufferedReader sInput;
+		BufferedWriter sOutput;
+		// the Username of the Client
+		String username;
+		// the only type of message a will receive
+		String message;
+
+		ClientThread(Socket socket) {
+			
+			this.socket = socket;
+
+			try
+			{
+				// create output first
+				//sOutput = new ObjectOutputStream(socket.getOutputStream());
+				//sInput  = new ObjectInputStream(socket.getInputStream());
+				sOutput = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+				sInput = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+				// read the username
+				int c = -1;
+				StringBuilder builder = new StringBuilder();
+				while((c=sInput.read()) != -1){
+					builder.append(String.valueOf(c));
+				}
+				username = builder.toString();
+				System.out.println(username + " just connected.");
+			}
+			catch (IOException e) {
+				return;
+			}
+		}
+
+		public void run() {
+			// to loop until LOGOUT
+			boolean keepGoing = true;
+			while(keepGoing) {
+				try {
+					int c = -1;
+					StringBuilder builder = new StringBuilder();
+					while((c=sInput.read()) != -1){
+						builder.append(String.valueOf((char)c));
+					}
+					message = builder.toString();
+				}
+				catch (IOException e) {
+					break;				
+				}
+
+				broadcast(username + ": " + message);	
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+			}
+			close();
+		}
+		
+		// try to close everything
+		private void close() {
+			// try to close the connection
+			try {
+				if(sOutput != null) sOutput.close();
+			}
+			catch(Exception e) {}
+			try {
+				if(sInput != null) sInput.close();
+			}
+			catch(Exception e) {};
+			try {
+				if(socket != null) socket.close();
+			}
+			catch (Exception e) {}
+		}
+
+
+		private boolean writeMsg(String msg) {
+			// if Client is still connected send the message to it
+			if(!socket.isConnected()) {
+				close();
+				return false;
+			}
+			// write the message to the stream
+			try {
+				System.out.println(msg);
+				sOutput.write(msg, 0, msg.length());
+			}
+			// if an error occurs, do not abort just inform the user
+			catch(IOException e) {
+				System.out.println("Error sending message to " + username);
+				System.out.println(e.toString());
+			}
+			return true;
+		}
+	}
+}
+
+
+

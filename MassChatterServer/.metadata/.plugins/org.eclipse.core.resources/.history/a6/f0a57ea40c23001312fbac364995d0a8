@@ -1,0 +1,81 @@
+package mainPackage;
+
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.io.IOException;
+
+public class Server extends Thread
+{
+	private static final int PORT = 5999;
+	private static final int ROOM_THROTTLE = 200;
+	private ServerSocket serverSocket;
+	private InetAddress hostAddress;
+	private Socket socket;
+	//private ArrayList<UmbraUser> users = new ArrayList<UmbraUser>();
+
+	public static void main(String[] args) {
+		Server srv = new Server();
+		srv.run();
+	}
+	
+	public Server()
+	{
+		//set hostAddress to the local host address of the server this program is running on
+		try
+		{
+			hostAddress = InetAddress.getLocalHost();
+		}
+		catch(UnknownHostException e)
+		{
+			System.out.println("NO LOCAL HOST FOUND!");
+			return;
+		}
+		// Announce the host address
+		System.out.println("Server host address is: "+hostAddress);
+		// Attempt to create server socket
+		try
+		{
+			serverSocket = new ServerSocket(PORT,0,hostAddress);
+		}
+		catch(IOException e)
+		{
+			System.out.println("Could not open server socket.");
+			return;
+		}
+		// Announce the socket creation
+		System.out.println("Socket "+serverSocket+" created.");
+	}
+
+	public void run()
+	{
+		// Announce the starting of the process
+		System.out.println("Room has been started.");
+		// Enter the main loop
+		while(true)
+		{
+			// Get a client trying to connect
+			try
+			{
+				socket = serverSocket.accept();
+			}
+			catch(IOException e)
+			{
+				System.out.println("Could not get a client.");
+			}
+			// Client has connected
+			System.out.println("Client "+socket+" has connected.");
+			// Sleep
+			try
+			{
+				Thread.sleep(ROOM_THROTTLE);
+			}
+			catch(InterruptedException e)
+			{
+				System.out.println("Room has been interrupted.");
+			}
+		}
+	}
+}
+

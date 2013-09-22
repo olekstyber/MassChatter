@@ -1,0 +1,126 @@
+package mainPackage;
+
+import java.net.*;
+import java.io.*;
+import java.util.*;
+
+public class Server
+{
+	private static final int PORT = 5999;
+	private static final int ROOM_THROTTLE = 200;
+	private ServerSocket serverSocket;
+	private InetAddress hostAddress;
+	private Socket socket;
+	private ArrayList<ServerThread> clients = new ArrayList<ServerThread>();
+
+	//every single connected client will have its thread object of this class
+	private class ServerThread extends Thread{
+		Socket socket;
+		ObjectInputStream sInput;
+		ObjectOutputStream sOutput;
+		int id;
+		String username;
+		String clientMsg;
+		
+		ServerThread(Socket socket){
+			this.socket = socket;
+			try{
+                // create output first
+                sOutput = new ObjectOutputStream(socket.getOutputStream());
+                sInput  = new ObjectInputStream(socket.getInputStream());
+                // read the username
+                username = (String) sInput.readObject();
+                System.out.println(username + " just connected.");
+            }
+            catch (IOException e) {
+            	System.out.println("Exception creating new Input/output Streams: " + e);
+                return;
+            } catch (ClassNotFoundException e) {
+				e.printStackTrace();
+			}
+			
+		}
+		
+		private void sendMsgToServer(String msg){
+			
+		}
+		
+		public void run(){
+			while(true){
+				try{
+					clientMsg = (String)sInput.readObject();
+				}
+				catch(IOException e){
+					System.out.println("Coulndn't read streams!");
+				} catch (ClassNotFoundException e) {
+					e.printStackTrace();
+				}
+				
+			}
+		}
+	}
+	
+	public static void main(String[] args) {
+		Server srv = new Server();
+		srv.run();
+	}
+	
+	public Server()
+	{
+		//set hostAddress to the local host address of the server this program is running on
+		try
+		{
+			hostAddress = InetAddress.getLocalHost();
+		}
+		catch(UnknownHostException e)
+		{
+			System.out.println("NO LOCAL HOST FOUND!");
+			return;
+		}
+		// Announce the host address
+		System.out.println("Server host address is: "+hostAddress);
+		// Attempt to create server socket
+		try
+		{
+			serverSocket = new ServerSocket(PORT,0,hostAddress);
+		}
+		catch(IOException e)
+		{
+			System.out.println("Could not open server socket.");
+			return;
+		}
+		// Announce the socket creation
+		System.out.println("Socket "+serverSocket+" created.");
+	}
+
+	public void run()
+	{
+		// Announce the starting of the process
+		System.out.println("Room has been started.");
+		// Enter the main loop
+		while(true)
+		{
+			// Get a client trying to connect
+			try
+			{
+				socket = serverSocket.accept();
+			}
+			catch(IOException e)
+			{
+				System.out.println("Could not get a client.");
+			}
+			// Client has connected
+			System.out.println("Client "+socket+" has connected.");
+			// Sleep
+			try
+			{
+				Thread.sleep(ROOM_THROTTLE);
+			}
+			catch(InterruptedException e)
+			{
+				System.out.println("Room has been interrupted.");
+			}
+		}
+	}
+}
+
