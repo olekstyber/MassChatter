@@ -6,6 +6,8 @@
 #include "QDebug"
 #include <QTcpSocket>
 #include <QTimer>
+#include <QScrollBar>
+#include "ui_mainwindow.h"
 
 namespace Ui {
 class MainWindow;
@@ -28,6 +30,9 @@ protected:
 private slots:
 
 private:
+
+    int UPDATE_CHAT_TIME;
+
     Ui::MainWindow *ui;
 
     int PORT;

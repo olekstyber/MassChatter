@@ -24,7 +24,7 @@
      </rect>
     </property>
    </widget>
-   <widget class="QPlainTextEdit" name="chatText">
+   <widget class="QTextEdit" name="chatText">
     <property name="geometry">
      <rect>
       <x>0</x>
