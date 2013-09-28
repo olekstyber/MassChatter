@@ -6,6 +6,11 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    //for the login fields
+    //set echo mode of password input to password for security
+    ui->passwordInput->setEchoMode(QLineEdit::Password);
+
+    //for the chat window
     //set up the event filter onto usertextinput so it can catch a return input
     ui->userTextInput->installEventFilter(this);
     //set up the readonly property of chatText
@@ -63,4 +68,24 @@ void MainWindow::updateChat(){
     }
 
     chatUpdateTimer->start();
+}
+
+void MainWindow::on_logInButton_clicked()
+{
+    //write username and password to the server
+    //QString usernameQStr = ui->usernameInput->text();
+    //QString passwordQStr = ui->passwordInput->text();
+    QString loginInfoQStr = ui->usernameInput->text() + " " + ui->passwordInput->text();
+    /* to be added later
+     *if(usernameQStr.count(" ") > 0){
+     *  errorfix
+     *}
+     */
+    //const char* username = (usernameQStr+"\n").toUtf8().constData();
+    //const char* password = (passwordQStr+"\n").toUtf8().constData();
+    const char* loginInfo = (loginInfoQStr+"\n").toUtf8().constData();
+    clientSocket->write(loginInfo);
+    //clientSocket->write(password);
+
+    ui->stackedWidget->setCurrentWidget(ui->chatPage);
 }

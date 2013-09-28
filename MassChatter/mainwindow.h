@@ -7,6 +7,7 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include <QScrollBar>
+#include <QStackedWidget>
 #include "ui_mainwindow.h"
 
 namespace Ui {
@@ -29,6 +30,8 @@ protected:
 
 private slots:
 
+     void on_logInButton_clicked();
+
 private:
 
     int UPDATE_CHAT_TIME;
@@ -40,6 +43,8 @@ private:
 
     QTcpSocket *clientSocket;
     QTimer *chatUpdateTimer;
+
+    QStackedWidget *mainWidgetStack;
 
 };
 

@@ -14,25 +14,101 @@
    <string>MainWindow</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QPlainTextEdit" name="userTextInput">
+   <widget class="QStackedWidget" name="stackedWidget">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>170</y>
-      <width>400</width>
-      <height>70</height>
-     </rect>
-    </property>
-   </widget>
-   <widget class="QTextEdit" name="chatText">
-    <property name="geometry">
-     <rect>
-      <x>0</x>
+      <x>-1</x>
       <y>-1</y>
       <width>401</width>
-      <height>171</height>
+      <height>251</height>
      </rect>
     </property>
+    <property name="currentIndex">
+     <number>0</number>
+    </property>
+    <widget class="QWidget" name="logInPage">
+     <widget class="QLabel" name="passwordLabel">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>100</y>
+        <width>81</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Password</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="logInButton">
+      <property name="geometry">
+       <rect>
+        <x>190</x>
+        <y>160</y>
+        <width>80</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Log In</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="usernameInput">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>50</y>
+        <width>221</width>
+        <height>23</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QLabel" name="userNameLabel">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>20</y>
+        <width>81</width>
+        <height>16</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Username</string>
+      </property>
+     </widget>
+     <widget class="QLineEdit" name="passwordInput">
+      <property name="geometry">
+       <rect>
+        <x>50</x>
+        <y>120</y>
+        <width>221</width>
+        <height>23</height>
+       </rect>
+      </property>
+     </widget>
+    </widget>
+    <widget class="QWidget" name="chatPage">
+     <widget class="QPlainTextEdit" name="userTextInput">
+      <property name="geometry">
+       <rect>
+        <x>-1</x>
+        <y>170</y>
+        <width>411</width>
+        <height>70</height>
+       </rect>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="chatText">
+      <property name="geometry">
+       <rect>
+        <x>0</x>
+        <y>0</y>
+        <width>401</width>
+        <height>171</height>
+       </rect>
+      </property>
+     </widget>
+    </widget>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
