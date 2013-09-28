@@ -5,10 +5,12 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
+    ui->stackedWidget->setCurrentWidget(ui->logInPage);
 
     //for the login fields
     //set echo mode of password input to password for security
     ui->passwordInput->setEchoMode(QLineEdit::Password);
+    ui->newPass->setEchoMode(QLineEdit::Password);
 
     //for the chat window
     //set up the event filter onto usertextinput so it can catch a return input
@@ -73,19 +75,45 @@ void MainWindow::updateChat(){
 void MainWindow::on_logInButton_clicked()
 {
     //write username and password to the server
-    //QString usernameQStr = ui->usernameInput->text();
-    //QString passwordQStr = ui->passwordInput->text();
     QString loginInfoQStr = ui->usernameInput->text() + " " + ui->passwordInput->text();
-    /* to be added later
-     *if(usernameQStr.count(" ") > 0){
-     *  errorfix
-     *}
-     */
-    //const char* username = (usernameQStr+"\n").toUtf8().constData();
-    //const char* password = (passwordQStr+"\n").toUtf8().constData();
+    if(loginInfoQStr.count(" ") != 1 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+        return;
+    }
+
     const char* loginInfo = (loginInfoQStr+"\n").toUtf8().constData();
     clientSocket->write(loginInfo);
     //clientSocket->write(password);
 
     ui->stackedWidget->setCurrentWidget(ui->chatPage);
+}
+
+void MainWindow::on_goToRegisterButton_clicked()
+{
+    ui->stackedWidget->setCurrentWidget(ui->registerPage);
+}
+
+
+void MainWindow::on_backButton_clicked()
+{
+    ui->stackedWidget->setCurrentWidget(ui->logInPage);
+}
+
+void MainWindow::on_registerButton_clicked()
+{
+    QString registerInfoQStr = "REGISTER " + ui->newUsrName->text() +  " " + ui->newPass->text();
+    if(registerInfoQStr.count(" ") != 2 || ui->newUsrName->text() == "" || ui->newPass->text() == ""){
+        return;
+    }
+    const char* registerInfo = (registerInfoQStr+"\n").toUtf8().constData();
+    clientSocket->write(registerInfo);
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    logout();
+    event->accept();
+}
+
+void MainWindow::logout(){
+    clientSocket->write(QString("/LOGOUT").toUtf8().constData());
 }

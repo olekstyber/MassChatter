@@ -32,6 +32,12 @@ private slots:
 
      void on_logInButton_clicked();
 
+     void on_goToRegisterButton_clicked();
+
+     void on_backButton_clicked();
+
+     void on_registerButton_clicked();
+
 private:
 
     int UPDATE_CHAT_TIME;
@@ -45,6 +51,9 @@ private:
     QTimer *chatUpdateTimer;
 
     QStackedWidget *mainWidgetStack;
+
+    void closeEvent(QCloseEvent *event);
+    void logout();
 
 };
 
