@@ -34,6 +34,12 @@ private slots:
 
      void on_registerButton_clicked();
 
+     void on_refreshRoomsButton_clicked();
+
+     void on_createNewRoomButton_clicked();
+
+     void on_createRoomButton_clicked();
+
 private:
 
     int UPDATE_CHAT_TIME;
@@ -56,6 +62,7 @@ private:
 
     void closeEvent(QCloseEvent *event);
     void logout(LOGOUT_TYPE t);
+    void updateRoomSelectContents();
 
 };
 

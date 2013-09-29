@@ -8,6 +8,7 @@ import java.util.*;
 public class Server{
 	
 	private ArrayList<ClientThread> clients = new ArrayList<ClientThread>();
+	private ArrayList<Room> rooms = new ArrayList<Room>();
 	//port of the server
 	private static final int PORT = 5999;
 	//boolean that determines whether the server should continue running
@@ -18,7 +19,6 @@ public class Server{
 	public Server() {
 		this.start();
 	}
-	
 	
 	public void start() {
 		serverRun = true;
@@ -80,21 +80,39 @@ public class Server{
 			}
 		}
 	}
+	
+	private synchronized void broadcastToRoom(String message, String roomName){
+		//first, find the room corresponding to roomName
+		for(Room room:rooms){
+			if(room.getRoomName().compareTo(roomName)==0){
+				//then go through each client in the room and send him a message
+				//if client cant receive the message, then disconnect him from room.
+				for(int i = room.roomClients.size()-1; i >= 0; i--){
+					ClientThread client = room.roomClients.get(i);
+					if(!client.writeMsg(message)){
+						remove(i, room);
+						System.out.println("Disconnected Client " + client.username +
+								" from room " + room.getRoomName());
+					}
+				}
+				return;
+			}
+		}
+	}
 
+	synchronized void remove(int position, Room room){
+		room.roomClients.remove(position);
+		return;
+	}
+	
 	//this gets called by broadcast() when a client sends in a "/LOGOUT" request
 	synchronized void remove(int position) {
 				clients.remove(position);
 				return;
 	}
-	
-	
-	public static void main(String[] args){
-		// create a server object
-		Server server = new Server();
-	}
 
 	//the client thread will be run for every client connected to the server
-	class ClientThread extends Thread {
+	private class ClientThread extends Thread {
 		// the socket where to listen/talk
 		Socket socket;
 		BufferedWriter sOutput;
@@ -103,10 +121,11 @@ public class Server{
 		String loginInfo;
 		String username;
 		String password;
+		String roomName;
 		// the only type of message a will receive
 		String message;
 		//this boolean determines whether the client thread keeps running or not
-		boolean keepGoing = true, needToLogIn = true;
+		boolean keepGoing = true, needToLogIn = true, needToSelectRoom = true;
 		//every client thread has its own access point to the server's 
 		//database of usernames and passwords
 		MySQLAccess dbAccessor = new MySQLAccess();
@@ -139,24 +158,31 @@ public class Server{
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
-			}else{
-				// to loop until LOGOUT
-				while(keepGoing) {
-					try {
-						message = sInput.readLine();
-					}
-					catch (IOException e) {
-						break;				
-					}
-					//KEEP IN MIND THAT BROADCAST IS SYNCHRONIZED, CHECK HOW THIS WORKS WITH MANY USERS
-					broadcast(username + ": " + message + "\n");	
-					//to prevent threads from eating up all the processing time, 
-					//the thread will run() every second
-					try {
-						Thread.sleep(1000);
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
+			}
+			if(needToSelectRoom){
+				try {
+					selectRoom();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+
+			// to loop until LOGOUT
+			while(keepGoing) {
+				try {
+					message = sInput.readLine();
+				}
+				catch (IOException e) {
+					break;				
+				}
+				//KEEP IN MIND THAT BROADCAST IS SYNCHRONIZED, CHECK HOW THIS WORKS WITH MANY USERS
+				broadcast(username + ": " + message + "\n");	
+				//to prevent threads from eating up all the processing time, 
+				//the thread will run() every second
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
 				}
 			}
 			close();
@@ -164,6 +190,7 @@ public class Server{
 		
 		// try to close everything
 		private void close() {
+			System.out.println("CLOSE WAS CALLED!!");
 			// try to close the connection
 			try {
 				if(sOutput != null) sOutput.close();
@@ -183,6 +210,7 @@ public class Server{
 		private boolean writeMsg(String msg) {
 			//if socket isnt connected, close down the client thread
 			if(!socket.isConnected()) {
+				System.out.println("SOCKET WAS DISCONNECTED");
 				close();
 				return false;
 			}
@@ -191,6 +219,7 @@ public class Server{
 				close();
 				return false;
 			}
+			System.out.println("Writing out a message: " + msg);
 			//write the message to the client of this thread
 			try {
 				char[] chrArr = msg.toCharArray();
@@ -204,7 +233,7 @@ public class Server{
 			return true;
 		}
 		
-		private void processLoginData() throws SQLException, IOException{
+		private synchronized void processLoginData() throws SQLException, IOException{
 			//get data from the socket
 			loginInfo = sInput.readLine();
 			String[] login = loginInfo.split(" ");
@@ -221,6 +250,7 @@ public class Server{
 					processLoginData();
 					break;
 				case REGISTER_SUCCESS:
+					writeMsg("REGISTER_SUCCESS\n");
 					username = login[1];
 					password = login[2];
 					needToLogIn = false;
@@ -239,6 +269,7 @@ public class Server{
 					username = login[0];
 					password = login[1];
 					writeMsg("LOGIN_SUCCESS\n");
+					System.out.println("needToLogIn SET TO FALSE");
 					needToLogIn = false;
 					break;
 				case LOGIN_ERROR_USERNAME_NOT_FOUND:
@@ -256,6 +287,96 @@ public class Server{
 			}
 			
 		}
+		//this function will run once the user has logged into the client and is picking a room to join
+		private void selectRoom() throws IOException{
+			String roomInfo = sInput.readLine();
+			String[] roomInfoSplit = roomInfo.split(" ");
+			//if the user decided to create a new room
+			if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/CREATE_ROOM")==0){
+				boolean alreadyExists = false;
+				//check if that room name already exists
+				for(Room r:rooms){
+					if(r.getRoomName().compareTo(roomInfoSplit[1])==0){
+						alreadyExists = true;
+						break;
+					}
+				}
+				//if it does, give error to user
+				if(alreadyExists){
+					writeMsg("ROOM_ALREADY_EXISTS\n");
+					selectRoom();
+				}
+				//otherwise, create the room and put the client thread into it
+				else{
+					Room r = new Room(roomInfoSplit[1]);
+					rooms.add(r);
+					r.roomClients.add(this);
+					roomName = r.getRoomName();
+					needToSelectRoom=false;
+					writeMsg("ROOM_JOINED\n");
+				}
+			}
+			//otherwise if the user is trying to join a room
+			else if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/JOIN_ROOM")==0){
+				//check if room exists
+				Room room = null;
+				for(Room r:rooms){
+					if(r.getRoomName().compareTo(roomInfoSplit[1])==0){
+						room=r;
+					}
+				}
+				//place client into room
+				if(room != null){
+					room.roomClients.add(this);
+					roomName = room.getRoomName();
+					needToSelectRoom=false;
+					writeMsg("ROOM_JOINED\n");
+				}else{
+					writeMsg("ROOM_DOESNT_EXIST\n");
+					selectRoom();
+				}
+			}
+			else if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/REQUEST_ROOMS")==0){
+				//create string of all the room names on the server
+				String roomData = "";
+				for(Room r:rooms){
+					roomData+=r.getRoomName();
+				}
+				roomData+='\n';
+				writeMsg(roomData);
+			}
+			else{
+				writeMsg("UNKNOWN_ERROR_JOINING_ROOM\n");
+			}
+		}
+	}
+	
+	private class Room extends Thread{
+		private String name;
+		ArrayList<ClientThread> roomClients = new ArrayList<ClientThread>();
+		
+		Room(String name){
+			this.name = name;
+		}
+		
+		
+		public String getRoomName(){
+			return name;
+		}
+		
+		private void close(){
+			for(ClientThread t:roomClients){
+				t.writeMsg("This room has been closed. Disconnecting from the server.");
+				t.close();
+			}
+		}
+		
+		
+	}
+	
+	public static void main(String[] args){
+		// create a server object
+		Server server = new Server();
 	}
 }
 
