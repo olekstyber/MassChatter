@@ -10,7 +10,6 @@ MainWindow::MainWindow(QWidget *parent) :
     //for the login fields
     //set echo mode of password input to password for security
     ui->passwordInput->setEchoMode(QLineEdit::Password);
-    ui->newPass->setEchoMode(QLineEdit::Password);
 
     //for the chat window
     //set up the event filter onto usertextinput so it can catch a return input
@@ -26,8 +25,9 @@ MainWindow::MainWindow(QWidget *parent) :
 
     chatUpdateTimer = new QTimer(this);
     connect(chatUpdateTimer, SIGNAL(timeout()), this, SLOT(updateChat()));
+    //chatUpdateTimer->blockSignals(true);
     UPDATE_CHAT_TIME = 200;
-    chatUpdateTimer->start(UPDATE_CHAT_TIME);
+    //chatUpdateTimer->start(UPDATE_CHAT_TIME);
 
 }
 
@@ -84,32 +84,38 @@ void MainWindow::on_logInButton_clicked()
     //write username and password to the server
     QString loginInfoQStr = ui->usernameInput->text() + " " + ui->passwordInput->text();
     if(loginInfoQStr.count(" ") != 1 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+        ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
 
     const char* loginInfo = (loginInfoQStr+"\n").toUtf8().constData();
     clientSocket->write(loginInfo);
 
-    ui->stackedWidget->setCurrentWidget(ui->chatPage);
-}
+    if(clientSocket->waitForConnected(10000)){
+        QString clientLogInResponse = clientSocket->readAll();
+        switch(clientLogInResponse){
+        case "LOGIN_SUCCESS\n":
+            ui->stackedWidget->setCurrentWidget(ui->chatPage);
+            //NEED TO CHECK THE MESSAGE
+            break;
+        default:
+            ui->serverMessageLogIn->setText("Recieved an unknown response from the server. Please try again.");
+        }
+    }
 
-void MainWindow::on_goToRegisterButton_clicked()
-{
-    ui->stackedWidget->setCurrentWidget(ui->registerPage);
-}
+    //DO ACCESS CHECKING HERE
 
-
-void MainWindow::on_backButton_clicked()
-{
-    ui->stackedWidget->setCurrentWidget(ui->logInPage);
+    //ui->stackedWidget->setCurrentWidget(ui->chatPage);
 }
 
 void MainWindow::on_registerButton_clicked()
 {
-    QString registerInfoQStr = "REGISTER " + ui->newUsrName->text() +  " " + ui->newPass->text();
-    if(registerInfoQStr.count(" ") != 2 || ui->newUsrName->text() == "" || ui->newPass->text() == ""){
+    QString registerInfoQStr = "REGISTER " + ui->usernameInput->text() +  " " + ui->passwordInput->text();
+    if(registerInfoQStr.count(" ") != 2 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+        ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
+    ui->serverMessageLogIn->setText("Sending your username to server...");
     const char* registerInfo = (registerInfoQStr+"\n").toUtf8().constData();
     clientSocket->write(registerInfo);
 }

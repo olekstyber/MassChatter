@@ -32,10 +32,6 @@ private slots:
 
      void on_logInButton_clicked();
 
-     void on_goToRegisterButton_clicked();
-
-     void on_backButton_clicked();
-
      void on_registerButton_clicked();
 
 private:

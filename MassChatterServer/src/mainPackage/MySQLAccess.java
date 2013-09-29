@@ -47,7 +47,7 @@ public class MySQLAccess {
 	    	  preparedStatement.setString(1, username);
 	    	  preparedStatement.setString(2, password);
 	    	  preparedStatement.executeUpdate();
-	    	  readDataBase(MYSQL_ACCESS_TYPE.LOGIN, username, password);
+	    	  return MYSQL_ACCESS_TYPE.REGISTER_SUCCESS;
 	      }
       }
       
@@ -63,8 +63,7 @@ public class MySQLAccess {
     	  }
     	  //otherwise, check whether the password given matches the password stored in the database
     	  //if it does, then proceed with the login
-    	  resultSet.next();
-    	  if(resultSet.getString(1).compareTo(password)==0){
+    	  if(resultSet.getString(2).compareTo(password)==0){
     		  return MYSQL_ACCESS_TYPE.LOGIN_SUCCESS;
     	  }else{
     		  //if it doesnt, return incorrect password error
