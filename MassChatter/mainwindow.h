@@ -42,6 +42,12 @@ private:
 
     int UPDATE_CHAT_TIME;
 
+    enum LOGOUT_TYPE{
+        CLOSE_LOGOUT = 0,
+        BUTTON_LOGOUT,
+        MESSAGE_LOGOUT
+    };
+
     Ui::MainWindow *ui;
 
     int PORT;
@@ -53,7 +59,7 @@ private:
     QStackedWidget *mainWidgetStack;
 
     void closeEvent(QCloseEvent *event);
-    void logout();
+    void logout(LOGOUT_TYPE t);
 
 };
 

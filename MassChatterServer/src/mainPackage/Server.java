@@ -2,6 +2,7 @@ package mainPackage;
 
 import java.io.*;
 import java.net.*;
+import java.sql.SQLException;
 import java.util.*;
 
 public class Server{
@@ -12,8 +13,9 @@ public class Server{
 	private ServerSocket serverSocket;
 	
 	private File accountInfo = new File("userData//acctInfo.data");
-
-	
+	PrintWriter fileOut;
+	Scanner fileIn;
+		
 	public Server() {
 		this.start();
 	}
@@ -21,10 +23,17 @@ public class Server{
 	
 	public void start() {
 		serverRun = true;
-		
+				
+		try {
+			loadBuffers();
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+				
 		try 
 		{
 			serverSocket = new ServerSocket(PORT);
+
 			while(serverRun) 
 			{
 				System.out.println("Server waiting for Clients on port " + PORT + ".");
@@ -54,7 +63,10 @@ public class Server{
 			catch(Exception e) {}
 		}
 		// something went bad
-		catch (IOException e) {}
+		catch (IOException e) {System.out.println(e.toString());} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}		
 
 	protected void stop() throws IOException {
@@ -63,8 +75,6 @@ public class Server{
 
 	
 	private synchronized void broadcast(String message) {
-		// display message on console or GUI
-		//System.out.print(message);
 		
 		for(int i = clients.size(); --i >= 0;) {
 			ClientThread client = clients.get(i);
@@ -80,6 +90,12 @@ public class Server{
 				clients.remove(position);
 				return;
 	}
+	
+	private void loadBuffers() throws IOException{
+		fileIn = new Scanner(accountInfo);
+		fileOut = new PrintWriter(new BufferedWriter(new FileWriter(accountInfo, true)));
+	}
+	
 	
 	public static void main(String[] args){
 		// create a server object
@@ -98,17 +114,15 @@ public class Server{
 		String password;
 		// the only type of message a will receive
 		String message;
-		PrintWriter fileOut;
-		Scanner fileIn;
 
-		ClientThread(Socket socket) {
+		MySQLAccess a = new MySQLAccess();
+
+		ClientThread(Socket socket) throws SQLException {
 			
 			this.socket = socket;
 
 			try
 			{	
-				//create buffers to read user account data
-				loadBuffers();
 				// create socket input/output streams
 				sOutput = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
 				sInput = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -169,7 +183,8 @@ public class Server{
 				close();
 				return false;
 			}
-			if(msg.compareTo("/LOGOUT")==0){
+			if(msg.compareTo(username + ": " + "/LOGOUT" + "\n")==0){
+				System.out.println("CLIENT LOGGED OUT");
 				close();
 				return false;
 			}
@@ -187,38 +202,14 @@ public class Server{
 			return true;
 		}
 		
-		private boolean checkIfUsrExists(String username){
-			while(fileIn.hasNextLine()){
-				if(fileIn.nextLine().split(" ")[0].compareTo(username)==0){
-					return true;
-				}
-			}
-			return false;
-		}
-		
-		private void loadBuffers() throws IOException{
-			fileIn = new Scanner(accountInfo);
-			fileOut = new PrintWriter(new BufferedWriter(new FileWriter(accountInfo, true)));
-		}
-		
-		private synchronized void processLoginData(String[] login){
+		private void processLoginData(String[] login) throws SQLException{
 			//check if the user terminated the client
 			if(login.length == 1 && login[0].compareTo("/LOGOUT")==0) close();
 			//check if the login data array is of the form "REGISTER username password"
-			else if(login.length == 3 && login[0].compareTo("REGISTER") == 0){
-				//check if the username already exists in the database
-				if(!checkIfUsrExists(login[1])){
-					//register the username
-					fileOut.println(login[1] + " " + login[2]);
-					fileOut.flush();
-				}else writeMsg("REGISTRATION_FAILURE_USERNAME");
-			}else{
-				username = login[0];
-				password = login[1];
-				System.out.println(username + " just connected.");
-				System.out.println(username + "'s password is " + password);
-				
+			else if(login.length == 3 && login[0].compareTo("REGISTER")==0){
+				a.readDataBase(MYSQL_ACCESS_TYPE.REGISTER, login[1], login[2]);
 			}
+			
 		}
 	}
 }

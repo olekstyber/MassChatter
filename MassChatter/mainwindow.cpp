@@ -23,7 +23,6 @@ MainWindow::MainWindow(QWidget *parent) :
 
     clientSocket = new QTcpSocket(); //create TCP-based socket
     clientSocket->connectToHost(IP,PORT);
-    clientSocket->waitForConnected();
 
     chatUpdateTimer = new QTimer(this);
     connect(chatUpdateTimer, SIGNAL(timeout()), this, SLOT(updateChat()));
@@ -45,14 +44,22 @@ MainWindow::~MainWindow()
 bool MainWindow::eventFilter(QObject *obj, QEvent *e){
     if(obj==ui->userTextInput && e->type() == QEvent::KeyPress &&
             static_cast<QKeyEvent*>(e)->key() == Qt::Key_Return){
-        if(ui->userTextInput->toPlainText() == ""){
+
+        QString userInput = ui->userTextInput->toPlainText();
+
+        if(userInput == ""){
             return true;
         }
 
-        const char* userMsgInChars = (ui->userTextInput->toPlainText()+"\n").toUtf8().constData();
+        const char* userMsgInChars = (userInput+"\n").toUtf8().constData();
         clientSocket->write(userMsgInChars);
 
+        if(userInput.compare("/LOGOUT")==0){
+            logout(MESSAGE_LOGOUT);
+        }
+
         ui->userTextInput->setPlainText("");
+
         return true;
     }
 
@@ -61,14 +68,14 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *e){
 
 //this function executes every UPDATE_CHAT_TIME ms and displays the data that was sent to the client by the server
 void MainWindow::updateChat(){
-
-    QString clientStreamString = clientSocket->readAll();
-    if(clientStreamString != ""){
-        ui->chatText->insertPlainText(QString(clientStreamString));
-        ui->chatText->verticalScrollBar()->setSliderPosition(
-            ui->chatText->verticalScrollBar()->maximum());
+    if(clientSocket->waitForConnected(1000)){
+        QString clientStreamString = clientSocket->readAll();
+        if(clientStreamString != ""){
+            ui->chatText->insertPlainText(QString(clientStreamString));
+            ui->chatText->verticalScrollBar()->setSliderPosition(
+                ui->chatText->verticalScrollBar()->maximum());
+        }
     }
-
     chatUpdateTimer->start();
 }
 
@@ -82,7 +89,6 @@ void MainWindow::on_logInButton_clicked()
 
     const char* loginInfo = (loginInfoQStr+"\n").toUtf8().constData();
     clientSocket->write(loginInfo);
-    //clientSocket->write(password);
 
     ui->stackedWidget->setCurrentWidget(ui->chatPage);
 }
@@ -110,10 +116,11 @@ void MainWindow::on_registerButton_clicked()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    logout();
+    logout(CLOSE_LOGOUT);
     event->accept();
 }
 
-void MainWindow::logout(){
+void MainWindow::logout(LOGOUT_TYPE t){
     clientSocket->write(QString("/LOGOUT").toUtf8().constData());
+    if(t == BUTTON_LOGOUT || t == MESSAGE_LOGOUT) this->close();
 }
