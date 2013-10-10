@@ -82,6 +82,7 @@ public class Server{
 	}
 	
 	private synchronized void broadcastToRoom(String message, String roomName){
+		message+='\n';
 		//first, find the room corresponding to roomName
 		for(Room room:rooms){
 			if(room.getRoomName().compareTo(roomName)==0){
@@ -118,7 +119,6 @@ public class Server{
 		BufferedWriter sOutput;
 		BufferedReader sInput;
 		// the username and password of the client
-		String loginInfo;
 		String username;
 		String password;
 		String roomName;
@@ -149,24 +149,6 @@ public class Server{
 		//the thread will keep running until it receives a "/LOGOUT" request
 		//in a run, it will get a message from the client and broadcast() it to the server
 		public void run() {
-			if(needToLogIn){
-				//keep trying to receive login data from the client
-				try {
-					processLoginData();
-				} catch (SQLException e) {
-					e.printStackTrace();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-			if(needToSelectRoom){
-				try {
-					selectRoom();
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-
 			// to loop until LOGOUT
 			while(keepGoing) {
 				try {
@@ -175,10 +157,24 @@ public class Server{
 				catch (IOException e) {
 					break;				
 				}
+				//If the message is a server command (starts with "/"), then process the command
+				if(message.charAt(0)=='/'){
+					try {
+						processCommand(message);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				//Otherwise, if this thread is logged in and its room is selected, let it send a message.
+				else if(!needToLogIn && !needToSelectRoom){
+					broadcastToRoom(username + ": " + message, roomName);
+				}
+				//Otherwise, tell the room that it cannot send the message.
+				else writeMsg("CANT_SEND_MESSAGE\n");
 				//KEEP IN MIND THAT BROADCAST IS SYNCHRONIZED, CHECK HOW THIS WORKS WITH MANY USERS
-				broadcast(username + ": " + message + "\n");	
+				//broadcast(username + ": " + message + "\n");	
 				//to prevent threads from eating up all the processing time, 
-				//the thread will run() every second
+				//the thread will run every second
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
@@ -205,6 +201,51 @@ public class Server{
 			}
 			catch (Exception e) {}
 		}
+		
+		void processCommand(String msg) throws IOException{
+			String[] command = msg.split(" ");
+			//If thread logged out, tell the room that client DC'd.
+			//Note: this will end up closing the connection of the username thread.
+			if(command.length==1 && command[0].compareTo("/LOGOUT")==0 && !needToLogIn && !needToSelectRoom){
+				broadcastToRoom(username + " has disconnected.", roomName);
+			}
+			//If thread asked for a disconnect, close it.
+			if(command.length==1 && command[0].compareTo("/DISCONNECT")==0){
+				//If the client invoked the disconnect command while logged in and in a room, just log him out.
+				if(!needToLogIn && !needToSelectRoom){
+					processCommand("/LOGOUT");
+				}
+				//Otherwise, just close the connection.
+				close();
+			}
+			//If the command was a login or registration request, process the login data.
+			if(command.length == 3 && (command[0].compareTo("/LOGIN")==0 || command[0].compareTo("/REGISTER")==0)){
+				try {
+					processLoginData(command);
+				} catch (SQLException e) {
+					e.printStackTrace();
+				}
+			}
+			//If the command is a join room request:
+			if(command.length == 2 && (command[0].compareTo("/JOIN_ROOM")==0)){
+				selectRoom(command[1], false);
+			}
+			//If the command is a create room request:
+			if(command.length==2 && (command[0].compareTo("/CREATE_ROOM")==0)){
+				selectRoom(command[1], true);
+			}
+			//If the command is to request the list of rooms:
+			//Note: check whether the predicate string needs an endline.
+			if(command.length==1 && (command[0].compareTo("/REQUEST_ROOMS")==0)){
+				//create string of all the room names on the server
+				String roomData = "";
+				for(Room r:rooms){
+					roomData+=r.getRoomName();
+				}
+				roomData+='\n';
+				writeMsg(roomData);
+			}
+		}
 
 
 		private boolean writeMsg(String msg) {
@@ -214,7 +255,7 @@ public class Server{
 				close();
 				return false;
 			}
-			if(msg.compareTo(username + ": " + "/LOGOUT" + "\n")==0){
+			if(msg.compareTo(username + ": " + " has disconnected.\n")==0){
 				System.out.println("CLIENT LOGGED OUT");
 				close();
 				return false;
@@ -233,26 +274,19 @@ public class Server{
 			return true;
 		}
 		
-		private synchronized void processLoginData() throws SQLException, IOException{
-			//get data from the socket
-			loginInfo = sInput.readLine();
-			String[] login = loginInfo.split(" ");
-			
-			//check if the user terminated the client
-			if(login.length == 1 && login[0].compareTo("/LOGOUT")==0) close();
+		private synchronized void processLoginData(String[] loginInfo) throws SQLException, IOException{
 			//check if the login data array is of the form "REGISTER username password"
-			else if(login.length == 3 && login[0].compareTo("REGISTER")==0){
+			if(loginInfo[0].compareTo("/REGISTER")==0){
 				MYSQL_ACCESS_TYPE resultOfRegistration =
-						dbAccessor.readDataBase(MYSQL_ACCESS_TYPE.REGISTER, login[1], login[2]);
+						dbAccessor.readDataBase(MYSQL_ACCESS_TYPE.REGISTER, loginInfo[1], loginInfo[2]);
 				switch(resultOfRegistration){
 				case REGISTER_ERROR_USERNAME_ALREADY_EXISTS:
 					writeMsg("REGISTER_ERROR_USERNAME_ALREADY_EXISTS\n");
-					processLoginData();
 					break;
 				case REGISTER_SUCCESS:
 					writeMsg("REGISTER_SUCCESS\n");
-					username = login[1];
-					password = login[2];
+					username = loginInfo[1];
+					password = loginInfo[2];
 					needToLogIn = false;
 					break;
 				default:
@@ -260,25 +294,23 @@ public class Server{
 					this.close();
 				}
 			}
-			//check if the login data array is of the standard "username password" form
-			else if(login.length == 2){
+			//check if the login information is a login request
+			else if(loginInfo[0].compareTo("/LOGIN")==0){
 				MYSQL_ACCESS_TYPE resultOfLogin = 
-						dbAccessor.readDataBase(MYSQL_ACCESS_TYPE.LOGIN, login[0], login[1]);
+						dbAccessor.readDataBase(MYSQL_ACCESS_TYPE.LOGIN, loginInfo[1], loginInfo[2]);
 				switch(resultOfLogin){
 				case LOGIN_SUCCESS:
-					username = login[0];
-					password = login[1];
+					username = loginInfo[1];
+					password = loginInfo[2];
 					writeMsg("LOGIN_SUCCESS\n");
 					System.out.println("needToLogIn SET TO FALSE");
 					needToLogIn = false;
 					break;
 				case LOGIN_ERROR_USERNAME_NOT_FOUND:
 					writeMsg("LOGIN_ERROR_USERNAME_NOT_FOUND\n");
-					processLoginData();
 					break;
 				case LOGIN_ERROR_INCORRECT_PASSWORD:
 					writeMsg("LOGIN_ERROR_INCORRECT_PASSWORD\n");
-					processLoginData();
 					break;
 				default:
 					writeMsg("LOGIN_UNKNOWN_ERROR\n");
@@ -287,16 +319,15 @@ public class Server{
 			}
 			
 		}
+
 		//this function will run once the user has logged into the client and is picking a room to join
-		private void selectRoom() throws IOException{
-			String roomInfo = sInput.readLine();
-			String[] roomInfoSplit = roomInfo.split(" ");
+		private void selectRoom(String name, boolean createNew) throws IOException{
 			//if the user decided to create a new room
-			if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/CREATE_ROOM")==0){
+			if(createNew){
 				boolean alreadyExists = false;
 				//check if that room name already exists
 				for(Room r:rooms){
-					if(r.getRoomName().compareTo(roomInfoSplit[1])==0){
+					if(r.getRoomName().compareTo(name)==0){
 						alreadyExists = true;
 						break;
 					}
@@ -304,11 +335,10 @@ public class Server{
 				//if it does, give error to user
 				if(alreadyExists){
 					writeMsg("ROOM_ALREADY_EXISTS\n");
-					selectRoom();
 				}
 				//otherwise, create the room and put the client thread into it
 				else{
-					Room r = new Room(roomInfoSplit[1]);
+					Room r = new Room(name);
 					rooms.add(r);
 					r.roomClients.add(this);
 					roomName = r.getRoomName();
@@ -316,12 +346,12 @@ public class Server{
 					writeMsg("ROOM_JOINED\n");
 				}
 			}
-			//otherwise if the user is trying to join a room
-			else if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/JOIN_ROOM")==0){
+			//Otherwise, the user is trying to join the room, so...
+			else{
 				//check if room exists
 				Room room = null;
 				for(Room r:rooms){
-					if(r.getRoomName().compareTo(roomInfoSplit[1])==0){
+					if(r.getRoomName().compareTo(name)==0){
 						room=r;
 					}
 				}
@@ -333,20 +363,7 @@ public class Server{
 					writeMsg("ROOM_JOINED\n");
 				}else{
 					writeMsg("ROOM_DOESNT_EXIST\n");
-					selectRoom();
 				}
-			}
-			else if(roomInfoSplit.length==2 && roomInfoSplit[0].compareTo("/REQUEST_ROOMS")==0){
-				//create string of all the room names on the server
-				String roomData = "";
-				for(Room r:rooms){
-					roomData+=r.getRoomName();
-				}
-				roomData+='\n';
-				writeMsg(roomData);
-			}
-			else{
-				writeMsg("UNKNOWN_ERROR_JOINING_ROOM\n");
 			}
 		}
 	}
@@ -366,7 +383,7 @@ public class Server{
 		
 		private void close(){
 			for(ClientThread t:roomClients){
-				t.writeMsg("This room has been closed. Disconnecting from the server.");
+				t.writeMsg("This room has been closed. Disconnecting from the server.\n");
 				t.close();
 			}
 		}
