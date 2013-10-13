@@ -6,10 +6,11 @@ import java.sql.SQLException;
 import java.util.*;
 
 public class Server{
-	
+	//The ArrayList clients contains all of the client threads that connected to the server.
 	private ArrayList<ClientThread> clients = new ArrayList<ClientThread>();
+	//ArrayList rooms is the list of all the rooms that the server contains.
 	private ArrayList<Room> rooms = new ArrayList<Room>();
-	//port of the server
+	//Port of the server
 	private static final int PORT = 5999;
 	//boolean that determines whether the server should continue running
 	private boolean serverRun;
@@ -67,49 +68,29 @@ public class Server{
 	protected void stop() throws IOException {
 		serverRun = false;
 	}
-
-	//(this will change in the future)
-	//broadcast to all the users within the server
-	private synchronized void broadcast(String message) {
-		
-		for(int i = clients.size(); --i >= 0;) {
-			ClientThread client = clients.get(i);
-			if(!client.writeMsg(message)) {
-				clients.remove(i);
-				System.out.println("Disconnected Client " + client.username + " removed from list.");
-			}
-		}
-	}
 	
-	private synchronized void broadcastToRoom(String message, String roomName){
+	//Given a message and a room, this function sends that message to every client 
+	//that is in the room. Note: it appends endl to the message.
+	private synchronized void broadcastToRoom(String message, Room room){
 		message+='\n';
-		//first, find the room corresponding to roomName
-		for(Room room:rooms){
-			if(room.getRoomName().compareTo(roomName)==0){
-				//then go through each client in the room and send him a message
-				//if client cant receive the message, then disconnect him from room.
-				for(int i = room.roomClients.size()-1; i >= 0; i--){
-					ClientThread client = room.roomClients.get(i);
-					if(!client.writeMsg(message)){
-						remove(i, room);
-						System.out.println("Disconnected Client " + client.username +
-								" from room " + room.getRoomName());
-					}
-				}
-				return;
+		//If somehow the room is null, then just ignore the request.
+		if(room == null) return;
+		//Go through the room and send each client in it a message.
+		//If a client can't accept the connection, then remove him.
+		for(int i = 0; i < room.roomClients.size(); i++){
+			ClientThread client = room.roomClients.get(i);
+			if(!client.writeMsg(message)){
+				remove(i, room);
+				client.close();
+				System.out.println("Disconnected Client " + client.username +
+						" from room " + room.getRoomName());
 			}
 		}
 	}
 
 	synchronized void remove(int position, Room room){
+		room.roomClients.get(position).room = null;
 		room.roomClients.remove(position);
-		return;
-	}
-	
-	//this gets called by broadcast() when a client sends in a "/LOGOUT" request
-	synchronized void remove(int position) {
-				clients.remove(position);
-				return;
 	}
 
 	//the client thread will be run for every client connected to the server
@@ -119,13 +100,12 @@ public class Server{
 		BufferedWriter sOutput;
 		BufferedReader sInput;
 		// the username and password of the client
-		String username;
-		String password;
-		String roomName;
+		String username, password;
+		Room room = null;
 		// the only type of message a will receive
 		String message;
 		//this boolean determines whether the client thread keeps running or not
-		boolean keepGoing = true, needToLogIn = true, needToSelectRoom = true;
+		boolean keepGoing = true, needToLogIn = true;
 		//every client thread has its own access point to the server's 
 		//database of usernames and passwords
 		MySQLAccess dbAccessor = new MySQLAccess();
@@ -157,7 +137,7 @@ public class Server{
 				catch (IOException e) {
 					break;				
 				}
-				//If the message is a server command (starts with "/"), then process the command
+				//If the message is a server command (starts with "/"), then process the command.
 				if(message.charAt(0)=='/'){
 					try {
 						processCommand(message);
@@ -166,15 +146,13 @@ public class Server{
 					}
 				}
 				//Otherwise, if this thread is logged in and its room is selected, let it send a message.
-				else if(!needToLogIn && !needToSelectRoom){
-					broadcastToRoom(username + ": " + message, roomName);
+				else if(!needToLogIn && room!=null){
+					broadcastToRoom(username + ": " + message, room);
 				}
 				//Otherwise, tell the room that it cannot send the message.
 				else writeMsg("CANT_SEND_MESSAGE\n");
-				//KEEP IN MIND THAT BROADCAST IS SYNCHRONIZED, CHECK HOW THIS WORKS WITH MANY USERS
-				//broadcast(username + ": " + message + "\n");	
-				//to prevent threads from eating up all the processing time, 
-				//the thread will run every second
+				//To prevent threads from eating up all the process time,
+				//every thread will wait one second before processing a message. 
 				try {
 					Thread.sleep(1000);
 				} catch (InterruptedException e) {
@@ -187,6 +165,8 @@ public class Server{
 		// try to close everything
 		private void close() {
 			System.out.println("CLOSE WAS CALLED!!");
+			if(room!=null) room.roomClients.remove(this);
+			room = null;
 			// try to close the connection
 			try {
 				if(sOutput != null) sOutput.close();
@@ -206,16 +186,13 @@ public class Server{
 			String[] command = msg.split(" ");
 			//If thread logged out, tell the room that client DC'd.
 			//Note: this will end up closing the connection of the username thread.
-			if(command.length==1 && command[0].compareTo("/LOGOUT")==0 && !needToLogIn && !needToSelectRoom){
-				broadcastToRoom(username + " has disconnected.", roomName);
+			if(command.length==1 && command[0].compareTo("/LOGOUT")==0 && !needToLogIn){
+				broadcastToRoom(username + " has disconnected.", room);
+				close();
 			}
 			//If thread asked for a disconnect, close it.
 			if(command.length==1 && command[0].compareTo("/DISCONNECT")==0){
-				//If the client invoked the disconnect command while logged in and in a room, just log him out.
-				if(!needToLogIn && !needToSelectRoom){
-					processCommand("/LOGOUT");
-				}
-				//Otherwise, just close the connection.
+				//Close the connection.
 				close();
 			}
 			//If the command was a login or registration request, process the login data.
@@ -240,7 +217,7 @@ public class Server{
 				//create string of all the room names on the server
 				String roomData = "";
 				for(Room r:rooms){
-					roomData+=r.getRoomName();
+					roomData+=r.getRoomName()+" ";
 				}
 				roomData+='\n';
 				writeMsg(roomData);
@@ -341,27 +318,22 @@ public class Server{
 					Room r = new Room(name);
 					rooms.add(r);
 					r.roomClients.add(this);
-					roomName = r.getRoomName();
-					needToSelectRoom=false;
+					room = r;
 					writeMsg("ROOM_JOINED\n");
 				}
 			}
 			//Otherwise, the user is trying to join the room, so...
 			else{
-				//check if room exists
-				Room room = null;
+				//check if room exists and place client in the room if it does.
 				for(Room r:rooms){
 					if(r.getRoomName().compareTo(name)==0){
 						room=r;
+						room.roomClients.add(this);
+						writeMsg("ROOM_JOINED\n");
 					}
 				}
-				//place client into room
-				if(room != null){
-					room.roomClients.add(this);
-					roomName = room.getRoomName();
-					needToSelectRoom=false;
-					writeMsg("ROOM_JOINED\n");
-				}else{
+				//Tell client that room doesn't exist if one with the given name was not found.
+				if(room == null){
 					writeMsg("ROOM_DOESNT_EXIST\n");
 				}
 			}
