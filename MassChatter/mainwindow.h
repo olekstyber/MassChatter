@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QScrollBar>
 #include <QStackedWidget>
+#include <QCryptographicHash>
 #include "ui_mainwindow.h"
 
 namespace Ui {
@@ -65,9 +66,9 @@ private:
     void closeEvent(QCloseEvent *event);
     void logout(LOGOUT_TYPE t);
     void updateRoomSelectContents();
-    QString recieveDataFromServer(bool ignoreReadyRead);
     void writeDataToServer(QString data);
-
+    QString recieveDataFromServer(bool ignoreReadyRead);
+    QString encryptPassword(QString username, QString password);
 };
 
 #endif // MAINWINDOW_H

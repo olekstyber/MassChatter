@@ -77,14 +77,15 @@ void MainWindow::updateChat(){
 
 //Checks whether the user input is acceptable as username/password and then tries to login the account.
 void MainWindow::on_logInButton_clicked()
-{
-    //Check validity.
-    QString loginInfoQStr = "/LOGIN " + ui->usernameInput->text() + " " + ui->passwordInput->text() + "\n";
-    if(loginInfoQStr.count(" ") != 2 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+{   
+    QString username = ui->usernameInput->text();
+    QString password = ui->passwordInput->text();
+    //Validity check.
+    if(username.count(" ") || username=="" || password.count(" ") || password==""){
         ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
-
+    QString loginInfoQStr = "/LOGIN " + username + " " + encryptPassword(username, password) + "\n";
     //Request server's approval...
     ui->serverMessageLogIn->setText("Sending your username to server...");
     writeDataToServer(loginInfoQStr);
@@ -109,12 +110,14 @@ void MainWindow::on_logInButton_clicked()
 //Checks whether the user input is acceptable as username/password and then tries to register the new account.
 void MainWindow::on_registerButton_clicked()
 {
+    QString username = ui->usernameInput->text();
+    QString password = ui->passwordInput->text();
     //Validity check.
-    QString registerInfoQStr = "/REGISTER " + ui->usernameInput->text() +  " " + ui->passwordInput->text() + "\n";
-    if(registerInfoQStr.count(" ") != 2 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+    if(username.count(" ") || username=="" || password.count(" ") || password==""){
         ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
+    QString registerInfoQStr = "/REGISTER " + username + " " + encryptPassword(username, password) + "\n";
     //Request server's approval...
     ui->serverMessageLogIn->setText("Sending your username to server...");
     writeDataToServer(registerInfoQStr);
@@ -232,4 +235,10 @@ void MainWindow::on_joinRoomButton_clicked()
         ui->roomList->clear();
         updateRoomSelectContents();
     }
+}
+
+//Returns a hex representation of the salted Md5 hashed password.
+QString MainWindow::encryptPassword(QString username, QString password){
+    QByteArray qba = QCryptographicHash::hash(("_MASS_CHATTER_" + username + "_" + password).toUtf8(), QCryptographicHash::Md5);
+    return qba.toHex();
 }
