@@ -26,8 +26,6 @@ MainWindow::MainWindow(QWidget *parent) :
     chatUpdateTimer = new QTimer(this);
     connect(chatUpdateTimer, SIGNAL(timeout()), this, SLOT(updateChat()));
     UPDATE_CHAT_TIME = 200;
-    //chatUpdateTimer->start(UPDATE_CHAT_TIME);
-
 }
 
 MainWindow::~MainWindow()
@@ -67,118 +65,171 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *e){
 
 //this function executes every UPDATE_CHAT_TIME ms and displays the data that was sent to the client by the server
 void MainWindow::updateChat(){
-    qDebug() << clientSocket->waitForConnected(1000);
-    if(clientSocket->waitForConnected(1000)){
-        QString clientStreamString = clientSocket->readAll();
-        if(clientStreamString != ""){
-            ui->chatText->insertPlainText(QString(clientStreamString));
-            ui->chatText->verticalScrollBar()->setSliderPosition(
-                ui->chatText->verticalScrollBar()->maximum());
-        }
+    QString clientStreamString = recieveDataFromServer(true);
+    if(clientStreamString != ""){
+        ui->chatText->moveCursor(QTextCursor::End);
+        ui->chatText->insertPlainText(QString(clientStreamString));
+        ui->chatText->verticalScrollBar()->setSliderPosition(
+            ui->chatText->verticalScrollBar()->maximum());
     }
     chatUpdateTimer->start();
 }
 
+//Checks whether the user input is acceptable as username/password and then tries to login the account.
 void MainWindow::on_logInButton_clicked()
 {
-    //write username and password to the server
-    QString loginInfoQStr = ui->usernameInput->text() + " " + ui->passwordInput->text();
-    if(loginInfoQStr.count(" ") != 1 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
+    //Check validity.
+    QString loginInfoQStr = "/LOGIN " + ui->usernameInput->text() + " " + ui->passwordInput->text() + "\n";
+    if(loginInfoQStr.count(" ") != 2 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
         ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
 
-    const char* loginInfo = (loginInfoQStr+"\n").toUtf8().constData();
-    clientSocket->write(loginInfo);
+    //Request server's approval...
+    ui->serverMessageLogIn->setText("Sending your username to server...");
+    writeDataToServer(loginInfoQStr);
 
-    if(clientSocket->waitForConnected(10000) && clientSocket->waitForReadyRead(10000)){
-        QString clientLogInResponse = clientSocket->readAll();
-        qDebug() << clientLogInResponse;
-        if(clientLogInResponse.compare("LOGIN_SUCCESS\n")==0){
-            ui->stackedWidget->setCurrentWidget(ui->roomSelectPage);
-            //chatUpdateTimer->start(UPDATE_CHAT_TIME);
-        }else if(clientLogInResponse.compare("LOGIN_ERROR_USERNAME_NOT_FOUND\n")==0){
-            ui->serverMessageLogIn->setText("The username you entered does not exist.");
-        }
-        else if(clientLogInResponse.compare("LOGIN_ERROR_INCORRECT_PASSWORD\n")==0){
-            ui->serverMessageLogIn->setText("The password you entered is incorrect.");
-        }
-        else{
-            ui->serverMessageLogIn->setText("Recieved an unknown response from the server. Please try again.");
-        }
+    QString clientLogInResponse = recieveDataFromServer(false);
+    if(clientLogInResponse.compare("LOGIN_SUCCESS\n")==0){
+        //On successful login, send user to roomSelectPage and update its contents.
+        ui->stackedWidget->setCurrentWidget(ui->roomSelectPage);
+        updateRoomSelectContents();
+    }else if(clientLogInResponse.compare("LOGIN_ERROR_USERNAME_NOT_FOUND\n")==0){
+        ui->serverMessageLogIn->setText("The username you entered does not exist.");
+    }
+    else if(clientLogInResponse.compare("LOGIN_ERROR_INCORRECT_PASSWORD\n")==0){
+        ui->serverMessageLogIn->setText("The password you entered is incorrect.");
+    }
+    else{
+        ui->serverMessageLogIn->setText("Recieved an unknown response from the server. Please try again.");
     }
 
 }
 
+//Checks whether the user input is acceptable as username/password and then tries to register the new account.
 void MainWindow::on_registerButton_clicked()
 {
-    QString registerInfoQStr = "REGISTER " + ui->usernameInput->text() +  " " + ui->passwordInput->text();
+    //Validity check.
+    QString registerInfoQStr = "/REGISTER " + ui->usernameInput->text() +  " " + ui->passwordInput->text() + "\n";
     if(registerInfoQStr.count(" ") != 2 || ui->usernameInput->text() == "" || ui->passwordInput->text() == ""){
         ui->serverMessageLogIn->setText("You have entered an invalid username or password!");
         return;
     }
+    //Request server's approval...
     ui->serverMessageLogIn->setText("Sending your username to server...");
-    const char* registerInfo = (registerInfoQStr+"\n").toUtf8().constData();
-    clientSocket->write(registerInfo);
+    writeDataToServer(registerInfoQStr);
 
-    if(clientSocket->waitForConnected(10000) && clientSocket->waitForReadyRead(10000)){
-        QString clientRegisterResponse = clientSocket->readAll();
-        if(clientRegisterResponse.compare("REGISTER_SUCCESS\n")==0){
-            ui->stackedWidget->setCurrentWidget(ui->roomSelectPage);
-            updateRoomSelectContents();
-            //chatUpdateTimer->start(UPDATE_CHAT_TIME);
-        }else if(clientRegisterResponse.compare("REGISTER_ERROR_USERNAME_ALREADY_EXISTS\n")==0){
-            ui->serverMessageLogIn->setText("The username you are trying to register already exists.");
-        }else{
-            ui->serverMessageLogIn->setText("Recieved an unknown response from the server. Please try again.");
-        }
+    //Interpret the resulting message.
+    QString clientRegisterResponse = recieveDataFromServer(false);
+    if(clientRegisterResponse.compare("REGISTER_SUCCESS\n")==0){
+        //If new account was registered, send the user to roomSelect page.
+        ui->stackedWidget->setCurrentWidget(ui->roomSelectPage);
+        updateRoomSelectContents();
+    }else if(clientRegisterResponse.compare("REGISTER_ERROR_USERNAME_ALREADY_EXISTS\n")==0){
+        //Otherwise inform the user of the problem with the registration process.
+        ui->serverMessageLogIn->setText("The username you are trying to register already exists.");
+    }else{
+        ui->serverMessageLogIn->setText("Recieved an unknown response from the server. Please try again.");
     }
 
 }
 
+//Close event catcher that tries to inform the server that the client logged out.
 void MainWindow::closeEvent(QCloseEvent *event)
 {
     logout(CLOSE_LOGOUT);
     event->accept();
 }
 
+//General logout function that also attempts to inform the server about the logout of this client.
 void MainWindow::logout(LOGOUT_TYPE t){
-    clientSocket->write(QString("/LOGOUT").toUtf8().constData());
+    writeDataToServer("/LOGOUT\n");
     if(t == BUTTON_LOGOUT || t == MESSAGE_LOGOUT) this->close();
 }
 
+//Send a request to the server for rooms and distribute the returned data
+//into the roomList.
 void MainWindow::updateRoomSelectContents(){
     //request room data from the server
-    const char* requestRooms = (QString("/REQEST_ROOMS\n")).toUtf8().constData();
-    clientSocket->write(requestRooms);
+    writeDataToServer("/REQUEST_ROOMS\n");
     //wait for data to be transferred from server to client
-    if(clientSocket->waitForConnected(10000) && clientSocket->waitForReadyRead(10000)){
-        //decipher data and put it into list
-        QString rooms = clientSocket->readAll();
-        QStringList roomsList = rooms.split(" ");
-        for(int i = 0; i<roomsList.size()-1; i++){
-            ui->roomList->addItem(roomsList.at(i));
-        }
+    QString serverResponse = recieveDataFromServer(false);
+    QStringList roomsList = serverResponse.split(" ");
+    for(int i = 0; i<roomsList.size(); i++){
+        ui->roomList->addItem(roomsList.at(i));
     }
 }
 
+//Clear the current roomList and update it.
 void MainWindow::on_refreshRoomsButton_clicked()
 {
     ui->roomList->clear();
     updateRoomSelectContents();
 }
 
+//Direct the user to newRoom creation window when he clicks the button.
 void MainWindow::on_createNewRoomButton_clicked()
 {
     ui->stackedWidget->setCurrentWidget(ui->createNewRoomPage);
 }
 
+//If the createRoom button was clicked, then send the roomName over to the server,
+//try to recieve the reply, and interpret the input.
 void MainWindow::on_createRoomButton_clicked()
 {
-    QString newRoomName = ui->newRoomNameInput->text();
-    newRoomName = "/CREATE_ROOM " + newRoomName + "\n";
-    const char* newRoomNameData = newRoomName.toUtf8().constData();
-    clientSocket->write(newRoomNameData);
+    writeDataToServer("/CREATE_ROOM " + ui->newRoomNameInput->text() + "\n");
+    QString serverResponse = recieveDataFromServer(false);
 
-    ui->stackedWidget->setCurrentWidget(ui->chatPage);
+    if(serverResponse.compare("ROOM_ALREADY_EXISTS\n")==0){
+        //Tell the user that the room already exists.
+        ui->createRoomResponse->setText("The room with this name already exists.");
+    }
+    else if(serverResponse.compare("ROOM_JOINED\n")==0){
+        //Place the user into the room and start the chat update timer.
+        ui->stackedWidget->setCurrentWidget(ui->chatPage);
+        chatUpdateTimer->start(UPDATE_CHAT_TIME);
+
+    }
+    else ui->createRoomResponse->setText("Unknown response from the server. Try again.");
+
+}
+
+//Holds for a max of 20 seconds trying to connect and read the data form the server.
+//Returns a QString representation of the message that was recieved from the server.
+//If the data couldnt be read or the socket couldnt get connected, then this returns an empty string.
+//IgnoreReadyRead flag tells the function whether to wait until there is a message, potentially extending the hang time,
+//or just return the empty string if there is no message.
+QString MainWindow::recieveDataFromServer(bool ignoreReadyRead){
+    QString out("");
+    if(clientSocket->waitForConnected(10000) && (ignoreReadyRead || clientSocket->waitForReadyRead(10000))){
+        out = clientSocket->readAll();
+    }
+    //For debugging purposes.
+    qDebug() << out;
+    return out;
+}
+
+//Given a QString data, convert it to proper format and send it to server for processing.
+void MainWindow::writeDataToServer(QString data){
+    clientSocket->write(data.toUtf8().constData());
+}
+
+//This function, after checking whether a room is selected, attempts to place the client into it.
+void MainWindow::on_joinRoomButton_clicked()
+{
+    QListWidgetItem *selectedRoom = ui->roomList->currentItem();
+    if(selectedRoom == NULL) return;
+    QString selectedRoomName("/JOIN_ROOM " + selectedRoom->text() + "\n");
+    //Send a request to join the room.
+    writeDataToServer(selectedRoomName);
+    QString serverResponse = recieveDataFromServer(false);
+    if(serverResponse.compare("ROOM_JOINED\n")==0){
+        //On successful join, let user get into chat and start the updates.
+        ui->stackedWidget->setCurrentWidget(ui->chatPage);
+        chatUpdateTimer->start(UPDATE_CHAT_TIME);
+    }else if(serverResponse.compare("ROOM_DOESNT_EXIST\n")==0){
+        //If somehow the user selected a room that got deleted in between refreshes, reload the room list.
+        ui->roomList->clear();
+        updateRoomSelectContents();
+    }
 }

@@ -133,6 +133,8 @@ public class Server{
 			while(keepGoing) {
 				try {
 					message = sInput.readLine();
+					if(message=="") message = "/";
+					System.out.println(message);
 				}
 				catch (IOException e) {
 					break;				

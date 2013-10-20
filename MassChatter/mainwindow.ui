@@ -24,7 +24,7 @@
      </rect>
     </property>
     <property name="currentIndex">
-     <number>2</number>
+     <number>1</number>
     </property>
     <widget class="QWidget" name="logInPage">
      <widget class="QLabel" name="passwordLabel">
@@ -144,7 +144,7 @@ p, li { white-space: pre-wrap; }
      <widget class="QPushButton" name="createNewRoomButton">
       <property name="geometry">
        <rect>
-        <x>230</x>
+        <x>270</x>
         <y>0</y>
         <width>131</width>
         <height>23</height>
@@ -157,7 +157,7 @@ p, li { white-space: pre-wrap; }
      <widget class="QPushButton" name="refreshRoomsButton">
       <property name="geometry">
        <rect>
-        <x>140</x>
+        <x>190</x>
         <y>0</y>
         <width>80</width>
         <height>23</height>
@@ -165,6 +165,19 @@ p, li { white-space: pre-wrap; }
       </property>
       <property name="text">
        <string>Refresh</string>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="joinRoomButton">
+      <property name="geometry">
+       <rect>
+        <x>110</x>
+        <y>0</y>
+        <width>80</width>
+        <height>23</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string>Join</string>
       </property>
      </widget>
     </widget>
@@ -203,6 +216,16 @@ p, li { white-space: pre-wrap; }
       </property>
       <property name="text">
        <string>Create Room</string>
+      </property>
+     </widget>
+     <widget class="QTextEdit" name="createRoomResponse">
+      <property name="geometry">
+       <rect>
+        <x>130</x>
+        <y>150</y>
+        <width>121</width>
+        <height>71</height>
+       </rect>
       </property>
      </widget>
     </widget>

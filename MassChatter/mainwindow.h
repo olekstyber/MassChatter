@@ -40,6 +40,8 @@ private slots:
 
      void on_createRoomButton_clicked();
 
+     void on_joinRoomButton_clicked();
+
 private:
 
     int UPDATE_CHAT_TIME;
@@ -63,6 +65,8 @@ private:
     void closeEvent(QCloseEvent *event);
     void logout(LOGOUT_TYPE t);
     void updateRoomSelectContents();
+    QString recieveDataFromServer(bool ignoreReadyRead);
+    void writeDataToServer(QString data);
 
 };
 
