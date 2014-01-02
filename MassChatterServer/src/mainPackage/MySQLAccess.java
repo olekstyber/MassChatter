@@ -12,6 +12,11 @@ public class MySQLAccess {
   private Statement statement = null;
   private PreparedStatement preparedStatement = null;
   private ResultSet resultSet = null;
+  
+  private String myUsername = "serveruser";
+  private String myPassword = "serverpassword";
+  private String myDatabase = "accountData";
+  private String myTable = "LOGININFO";
 
   public MYSQL_ACCESS_TYPE readDataBase(MYSQL_ACCESS_TYPE t, String username, String password) throws SQLException {
     try {
@@ -23,15 +28,15 @@ public class MySQLAccess {
 	   }
       //connect to the database on localhost
       connect = DriverManager
-          .getConnection("jdbc:mysql://localhost/accountData?"
-              + "user=serveruser&password=serverpassword");
+          .getConnection("jdbc:mysql://localhost/" + myDatabase + "?"
+              + "user=" + myUsername + "&password=" + myPassword);
       
       //if the access type to the database was a request to register, then
       //check if a username exists -- if it does, return a register username already exists error
       //if it doesnt, then register it into the database
       if(t==MYSQL_ACCESS_TYPE.REGISTER){
 	      preparedStatement = connect
-	    		  .prepareStatement("SELECT COUNT(1) from LOGININFO where username = ?;");
+	    		  .prepareStatement("SELECT COUNT(1) from " + myTable + " where username = ?;");
 	      preparedStatement.setString(1, username);
 	      resultSet = preparedStatement.executeQuery();
 	      resultSet.first();
@@ -43,7 +48,7 @@ public class MySQLAccess {
 	    	  //otherwise, register the user into the database
 	    	  //and recursively call readDataBase in order to log in that user.
 	    	  preparedStatement = connect
-	    			  .prepareStatement("insert into accountData.LOGININFO values (default, ?, ?)");
+	    			  .prepareStatement("insert into " + myTable + " values (default, ?, ?)");
 	    	  preparedStatement.setString(1, username);
 	    	  preparedStatement.setString(2, password);
 	    	  preparedStatement.executeUpdate();
@@ -53,7 +58,7 @@ public class MySQLAccess {
       
       if(t==MYSQL_ACCESS_TYPE.LOGIN){
     	  preparedStatement = connect
-    			  .prepareStatement("SELECT username,password FROM accountData.LOGININFO where username = ?");
+    			  .prepareStatement("SELECT username,pass FROM " + myTable + " where username = ?");
     	  preparedStatement.setString(1, username);
     	  resultSet = preparedStatement.executeQuery();
     	  boolean isEmpty = !(resultSet.next());
