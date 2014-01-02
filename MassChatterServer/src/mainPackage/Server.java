@@ -3,6 +3,7 @@ package mainPackage;
 import java.io.*;
 import java.net.*;
 import java.sql.SQLException;
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 public class Server{
@@ -49,9 +50,9 @@ public class Server{
 				for(int i = 0; i < clients.size(); ++i) {
 					ClientThread clientToDisconnect = clients.get(i);
 					try {
-					clientToDisconnect.sInput.close();
-					clientToDisconnect.sOutput.close();
-					clientToDisconnect.socket.close();
+						clientToDisconnect.sInput.close();
+						clientToDisconnect.sOutput.close();
+						clientToDisconnect.socket.close();
 					}
 					catch(IOException ioE) {}
 				}
@@ -82,12 +83,13 @@ public class Server{
 			if(!client.writeMsg(message)){
 				remove(i, room);
 				client.close();
-				System.out.println("Disconnected Client " + client.username +
-						" from room " + room.getRoomName());
+				System.out.println("Disconnected Client " + client.username + " from room " + room.getRoomName());
 			}
 		}
 	}
-
+	
+	//Given a position of client in the room and the actual room, this function removes
+	//the client from the room and sets client's current room to default null.
 	synchronized void remove(int position, Room room){
 		room.roomClients.get(position).room = null;
 		room.roomClients.remove(position);
@@ -99,17 +101,21 @@ public class Server{
 		Socket socket;
 		BufferedWriter sOutput;
 		BufferedReader sInput;
-		// the username and password of the client
+		// the username/password of the client
 		String username, password;
+		//Current room. Default is null.
 		Room room = null;
-		// the only type of message a will receive
+		//Message of this clientThread.
 		String message;
-		//this boolean determines whether the client thread keeps running or not
-		boolean keepGoing = true, needToLogIn = true;
-		//every client thread has its own access point to the server's 
-		//database of usernames and passwords
+		//Determines whether the clientThread needs to continue to run or whether its fine to remove it.
+		boolean keepGoing = true;
+		//Shows whether the connected client logged in or not.
+		boolean needToLogIn = true;
+		//Every client thread has its own access point to the server's 
+		//database of usernames and passwords.
 		MySQLAccess dbAccessor = new MySQLAccess();
 
+		//Construct the clientThread using server's socket and create sOutput and sInput.
 		ClientThread(Socket socket) throws SQLException {
 			
 			this.socket = socket;
@@ -126,13 +132,15 @@ public class Server{
 			}
 		}
 		
-		//the thread will keep running until it receives a "/LOGOUT" request
-		//in a run, it will get a message from the client and broadcast() it to the server
+		//The thread will keep running until it receives a "/LOGOUT" request.
+		//In a run, it will get a message from the client and broadcastToRoom() it to a room.
 		public void run() {
 			// to loop until LOGOUT
 			while(keepGoing) {
 				try {
 					message = sInput.readLine();
+					//If the user somehow manages to send out an empty message, treat it as a command and
+					//don't show it to other users.
 					if(message=="") message = "/";
 					System.out.println(message);
 				}
@@ -149,14 +157,15 @@ public class Server{
 				}
 				//Otherwise, if this thread is logged in and its room is selected, let it send a message.
 				else if(!needToLogIn && room!=null){
-					broadcastToRoom(username + ": " + message, room);
+					String date = (new SimpleDateFormat("h:mm:ss a")).format(new Date());
+					broadcastToRoom(username + " [" + date + "]: " + message, room);
 				}
 				//Otherwise, tell the room that it cannot send the message.
 				else writeMsg("CANT_SEND_MESSAGE\n");
 				//To prevent threads from eating up all the process time,
-				//every thread will wait one second before processing a message. 
+				//every thread will wait half a second before processing a message. 
 				try {
-					Thread.sleep(1000);
+					Thread.sleep(500);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -349,7 +358,6 @@ public class Server{
 		Room(String name){
 			this.name = name;
 		}
-		
 		
 		public String getRoomName(){
 			return name;

@@ -25,6 +25,7 @@ public:
 
 public slots:
     void updateChat();
+    bool reconnect();
 
 protected:
      bool eventFilter(QObject *obj, QEvent *e);
@@ -60,6 +61,7 @@ private:
 
     QTcpSocket *clientSocket;
     QTimer *chatUpdateTimer;
+    QTimer *reconnectTimer;
 
     QStackedWidget *mainWidgetStack;
 

@@ -8,7 +8,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->stackedWidget->setCurrentWidget(ui->logInPage);
 
     //for the login fields
-    //set echo mode of password input to password for security
+    //set echo mode of password input to Password for security
     ui->passwordInput->setEchoMode(QLineEdit::Password);
 
     //for the chat window
@@ -19,13 +19,21 @@ MainWindow::MainWindow(QWidget *parent) :
 
     IP = "localhost";
     PORT = 5999;
-
     clientSocket = new QTcpSocket(); //create TCP-based socket
-    clientSocket->connectToHost(IP,PORT);
 
     chatUpdateTimer = new QTimer(this);
+    reconnectTimer = new QTimer(this);
+    reconnectTimer->setInterval(2000);
+    //Connect chatUpdateTimer with updateChat slot.
     connect(chatUpdateTimer, SIGNAL(timeout()), this, SLOT(updateChat()));
+    //Connect the reconnectTimer to trigger reconnect function.
+    connect(reconnectTimer, SIGNAL(timeout()), this, SLOT(reconnect()));
+    //Connect clientSocket's disconnected signal to trigger reconnectTimer's start.
+    connect(clientSocket, SIGNAL(disconnected()), reconnectTimer, SLOT(start()));
     UPDATE_CHAT_TIME = 200;
+
+    //Try to connect to the server.
+    reconnect();
 }
 
 MainWindow::~MainWindow()
@@ -73,6 +81,17 @@ void MainWindow::updateChat(){
             ui->chatText->verticalScrollBar()->maximum());
     }
     chatUpdateTimer->start();
+}
+
+//Attemts to reconnect with the server at regular intervals.
+bool MainWindow::reconnect(){
+    clientSocket->connectToHost(IP,PORT);
+    if(clientSocket->waitForConnected(1000)){
+        reconnectTimer->stop();
+        return true;
+    }
+    reconnectTimer->start();
+    return false;
 }
 
 //Checks whether the user input is acceptable as username/password and then tries to login the account.
@@ -158,7 +177,9 @@ void MainWindow::updateRoomSelectContents(){
     //wait for data to be transferred from server to client
     QString serverResponse = recieveDataFromServer(false);
     QStringList roomsList = serverResponse.split(" ");
-    for(int i = 0; i<roomsList.size(); i++){
+    //Go from first element to one before last because last one is an endline
+    //that is used for flushing output and not a room.
+    for(int i = 0; i<roomsList.size()-1; i++){
         ui->roomList->addItem(roomsList.at(i));
     }
 }
@@ -180,6 +201,13 @@ void MainWindow::on_createNewRoomButton_clicked()
 //try to recieve the reply, and interpret the input.
 void MainWindow::on_createRoomButton_clicked()
 {
+    //Check if the room name is valid.
+    QString roomName = ui->newRoomNameInput->text();
+    QRegExp regexRoom("\\w{3,20}");
+    if(!regexRoom.exactMatch(roomName)){
+        ui->createRoomResponse->setText("Invalid room name. Names have to be 3-20 characters in length and contain only A-z and/or 0-9");
+        return;
+    }
     writeDataToServer("/CREATE_ROOM " + ui->newRoomNameInput->text() + "\n");
     QString serverResponse = recieveDataFromServer(false);
 
