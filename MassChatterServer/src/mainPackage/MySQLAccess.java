@@ -77,37 +77,7 @@ public class MySQLAccess {
       }
 
       return MYSQL_ACCESS_TYPE.ERROR;
-//      // Statements allow to issue SQL queries to the database
-//      statement = connect.createStatement();
-//      // Result set get the result of the SQL query
-//      resultSet = statement
-//          .executeQuery("select * from accountData.LOGININFO");
-//      writeResultSet(resultSet);
-//
-//      // PreparedStatements can use variables and are more efficient
-//      preparedStatement = connect
-//          .prepareStatement("insert into accountData.LOGININFO values (default, ?, ?)");
-//      // "myuser, webpage, datum, summary, COMMENTS from FEEDBACK.COMMENTS");
-//      // Parameters start with 1
-//      preparedStatement.setString(1, "tehusername");
-//      preparedStatement.setString(2, "tehpassword");
-//      preparedStatement.executeUpdate();
-//      
-//
-//      preparedStatement = connect
-//          .prepareStatement("SELECT username, password from accountData.LOGININFO");
-//      resultSet = preparedStatement.executeQuery();
-//      writeResultSet(resultSet);
-//
-//      // Remove again the insert comment
-//      preparedStatement = connect
-//      .prepareStatement("delete from accountData.LOGININFO where username= ? ; ");
-//      preparedStatement.setString(1, "tehusername");
-//      preparedStatement.executeUpdate();
-//      
-//      resultSet = statement
-//      .executeQuery("select * from accountData.LOGININFO");
-//      writeMetaData(resultSet);
+// 
       
     } catch (SQLException e) {
     	if(e.getErrorCode()==1062){
